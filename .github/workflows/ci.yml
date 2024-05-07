@@ -1,4 +1,4 @@
-name: patch firmware
+name: flash firmware
 
 # This rule triggers when the workflow will run
 on:
