@@ -1,0 +1,12 @@
+version: "3.8"
+services:
+  firmware:
+    environment:
+      - git_hash
+    build:
+      context: "."
+      dockerfile: "./Dockerfile"
+      tags:
+        - "localhost:5000/lumenssif:latest"
+    stop_signal: SIGINT
+

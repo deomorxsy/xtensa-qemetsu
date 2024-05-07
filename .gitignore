@@ -5,6 +5,8 @@
 .ccls
 src/secrets.h
 /assets/
+/artifacts/
+merged-flash.bin
 
 # Prerequisites
 *.d
