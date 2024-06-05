@@ -48,6 +48,12 @@ I choose the second one, then got the PKGBUILD:
 ; sudo ln -s ./opt/qemu-esp-xtensa-git/bin/qemu-system-xtensa /usr/bin/
 ```
 
+You may need ```99-platformio-udev.rules``` on Linux x86_64.
+```sh
+; curl -fsSL https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/system/99-platformio-udev.rules | sudo tee /etc/udev/rules.d/99-platformio-udev.rules
+; sudo udevadm control --reload
+; sudo udevadm trigger
+```
 
 
 ### Boot
