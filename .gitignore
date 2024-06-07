@@ -7,6 +7,12 @@ src/secrets.h
 /assets/
 /artifacts/
 merged-flash.bin
+compile_commands.json
+
+
+# lsp-based (clangd)
+.cache/
+compile_commands.json
 
 # Prerequisites
 *.d
