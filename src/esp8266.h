@@ -4,9 +4,10 @@
 #include "core/AsyncClient/AsyncClient.h"
 #include "core/NetConfig.h"
 #include "firestore/Documents.h"
+#include "firestore/Values.h"
 #include <ESP8266WiFi.h>
 #include <FirebaseClient.h>
-#include <system_error.h>
+//#include <system_error.h>
 
 
 #define PIR_SENSOR_PIN D1
@@ -45,18 +46,18 @@ FirebaseApp app;
 WiFiClientSecure ssl_client;
 #endif
 
-DefaultNetwork network;
+DefaultNetwork network = 1;
 
 // async
 using AsyncClient = AsyncClientClass;
 AsyncClient aClient(ssl_client, getNetwork(network));
 
-
-void asyncCB(AsyncResult &aResult);
-void printResult(AsyncResult &aResult);
-
-// Firestore instantiation
+// Firestore
 Firestore::Documents Docs;
+
+int counter = 0;
+unsigned long dataMillis = 0;
+bool taskCompleted = false;
 
 void setup() {
     Serial.begin(115200);
@@ -99,6 +100,49 @@ void setup() {
 }
 
 void loop() {
+
+    app.loop();
+
+    Docs.loop();
+
+    if (app.ready() && (millis() - dataMillis > 60000 || dataMillis == 0))
+    {
+        dataMillis = millis();
+
+        if (!taskCompleted)
+        {
+            taskCompleted = true;
+
+            Values::MapValue jp("time_zone", Values::IntegerValue(9));
+            jp.add("population", Values::IntegerValue(125570000));
+
+            Document<Values::Value> doc("japan", Values::Value(jp));
+
+             Values::MapValue bg("time_zone", Values::IntegerValue(1));
+            bg.add("population", Values::IntegerValue(11492641));
+
+            doc.add("Belgium", Values::Value(bg));
+
+            Values::MapValue sg("time_zone", Values::IntegerValue(8));
+            sg.add("population", Values::IntegerValue(5703600));
+
+            doc.add("Singapore", Values::Value(sg));
+
+            String documentPath = "info/countries";
+
+            // The value of Values::xxxValue, Values::Value and Document can be printed on Serial.
+
+            Serial.println("Create document... ");
+
+            Docs.createDocument(aClient, Firestore::Parent(FIREBASE_PROJECT_ID), documentPath, DocumentMask(), doc, asyncCB, "createDocumentTask");
+        }
+
+        String documentPath = "info/countries";
+
+        Serial.println("Get a document...");
+
+        Docs.get(aClient, Firestore::Parent(FIREBASE_PROJECT_ID), documentPath, GetDocumentOptions(DocumentMask("Singapore")), asyncCB, "getTask");
+    }
 
 }
 
