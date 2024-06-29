@@ -105,6 +105,14 @@ void loop() {
 
     Docs.loop();
 
+    int pir_signal = digitalRead(PIR_SENSOR_PIN);
+
+    // HIGH
+    if(signal == HIGH) {
+        digitalWrite(PIN_BUZZER, HIGH);
+    }
+    // LOW
+
     if (app.ready() && (millis() - dataMillis > 60000 || dataMillis == 0))
     {
         dataMillis = millis();

@@ -7,6 +7,13 @@ on:
 
 # jobs can run in sequence or parallel in a workflow
 jobs:
+  esp32:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          "./src/main.cpp"
   # This single job is called "build"
   build:
     # Specify the operating system for the runner job
