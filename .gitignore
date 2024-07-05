@@ -8,7 +8,7 @@ src/secrets.h
 /artifacts/
 merged-flash.bin
 compile_commands.json
-
+/venv/
 
 # lsp-based (clangd)
 .cache/
