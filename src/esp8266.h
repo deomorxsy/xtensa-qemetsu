@@ -1,10 +1,10 @@
-#include "./secrets.h"
+#include "./secrets.c"
 
 #include "Arduino.h"
 #include "core/AsyncClient/AsyncClient.h"
 #include "core/NetConfig.h"
-#include "firestore/Documents.h"
-#include "firestore/Values.h"
+//#include "firestore/Documents.h"
+//#include "firestore/Values.h"
 #include <ESP8266WiFi.h>
 #include <FirebaseClient.h>
 //#include <system_error.h>
@@ -23,13 +23,19 @@
 // Firebase console > Project Overview > Project settings.
 #define API_KEY         "web_API_KEY"
 
+#ifndef USER_MAIL
 #define USER_MAIL       "USER_MAIL"
+#endif
+
+#ifndef USER_PASSWORD
 #define USER_PASSWORD   "USER_PASSWORD"
+#endif
 
 // RTDB URL and database secret
 #ifndef DATABASE_URL
-#define DATABASE_URL ${DATABASE_URL_REPO_SECRET}
+#define DATABASE_URL "URL"
 #endif
+//#define DATABASE_URL ${DATABASE_URL_REPO_SECRET}
 
 #define FIREBASE_PROJECT_ID "PROJECT_ID"
 
@@ -46,18 +52,22 @@ FirebaseApp app;
 WiFiClientSecure ssl_client;
 #endif
 
-DefaultNetwork network = 1;
+DefaultNetwork network;
 
 // async
 using AsyncClient = AsyncClientClass;
 AsyncClient aClient(ssl_client, getNetwork(network));
+AsyncResult aResult_no_callback;
+
+// RealtimeDatabase
+RealtimeDatabase Database;
 
 // Firestore
-Firestore::Documents Docs;
+//Firestore::Documents Docs;
 
+bool taskComplete = false;
 int counter = 0;
 unsigned long dataMillis = 0;
-bool taskCompleted = false;
 
 void setup() {
     Serial.begin(115200);
@@ -89,10 +99,16 @@ void setup() {
 #endif
 #endif
 
+
+    // init Firebase connection
     initializeApp(aClient, app, getAuth(user_auth), asyncCB, "authTask");
 
-    app.getApp<Firestore::Documents>(Docs);
+    // bind FirebaseApp for authentication handler
+    app.getApp<RealtimeDatabase>(Database);
+    // unbind with Docs.resetApp();
+    //app.getApp<Firestore::Documents>(Docs);
 
+    Database.url(DATABASE_URL);
 
 
     Serial.println("Setup finished.");
@@ -103,13 +119,23 @@ void loop() {
 
     app.loop();
 
-    Docs.loop();
-
+    //PIR logic
     int pir_signal = digitalRead(PIR_SENSOR_PIN);
 
     // HIGH
-    if(signal == HIGH) {
-        digitalWrite(PIN_BUZZER, HIGH);
+    if (Database.set<bool>(aClient, "/test/bool", true, asyncCB, "setBoolTask")) {
+    //if (Firebase.setInt(firebaseData, "/soundSensor", soundValue)) {
+    Serial.println("Sound sensor value updated");
+    } else {
+        Serial.println("Failed to update sound sensor value");
+        Serial.println(firebaseData.errorReason());
+    }
+
+    if (Firebase.setInt(firebaseData, "/pirSensor", pirValue)) {
+        Serial.println("PIR sensor value updated");
+    } else {
+        Serial.println("Failed to update PIR sensor value");
+        Serial.println(firebaseData.errorReason());
     }
     // LOW
 
@@ -117,39 +143,51 @@ void loop() {
     {
         dataMillis = millis();
 
-        if (!taskCompleted)
+        if (app.ready() && !taskComplete)
         {
-            taskCompleted = true;
+            taskComplete = true;
 
-            Values::MapValue jp("time_zone", Values::IntegerValue(9));
-            jp.add("population", Values::IntegerValue(125570000));
 
-            Document<Values::Value> doc("japan", Values::Value(jp));
+            // Set int
+            Database.set<int>(aClient, "/test/int", 12345, asyncCB, "setIntTask");
+            // Set bool
+            Database.set<bool>(aClient, "/test/bool", true, asyncCB, "setBoolTask");
 
-             Values::MapValue bg("time_zone", Values::IntegerValue(1));
-            bg.add("population", Values::IntegerValue(11492641));
+            // Set string
+            Database.set<String>(aClient, "/test/string", "hello", asyncCB, "setStringTask");
 
-            doc.add("Belgium", Values::Value(bg));
+            // Set json
+            Database.set<object_t>(aClient, "/test/json", object_t("{\"data\":123}"), asyncCB, "setJsonTask");
+            //Docs.createDocument(aClient, Firestore::Parent(FIREBASE_PROJECT_ID), documentPath, DocumentMask(), doc, asyncCB, "createDocumentTask");
+            //
+            object_t json, obj1, obj2, obj3, obj4;
+            JsonWriter writer;
 
-            Values::MapValue sg("time_zone", Values::IntegerValue(8));
-            sg.add("population", Values::IntegerValue(5703600));
+            writer.create(obj1, "int/value", 9999);
+            writer.create(obj2, "string/value", string_t("hello"));
+            writer.create(obj3, "float/value", number_t(123.456, 2));
+            writer.join(obj4, 3 /* no. of object_t (s) to join */, obj1, obj2, obj3);
+            writer.create(json, "node/list", obj4);
 
-            doc.add("Singapore", Values::Value(sg));
+            // To print object_t
+            // Serial.println(json);
 
-            String documentPath = "info/countries";
+            Database.set<object_t>(aClient, "/test/json", json, asyncCB, "setJsonTask");
 
-            // The value of Values::xxxValue, Values::Value and Document can be printed on Serial.
+            object_t arr;
+            arr.initArray(); // initialize to be used as array
+            writer.join(arr, 4 /* no. of object_t (s) to join */, object_t("[12,34]"), object_t("[56,78]"), object_t(string_t("steve")), object_t(888));
 
-            Serial.println("Create document... ");
+            // Set array
+            Database.set<object_t>(aClient, "/test/arr", arr, asyncCB, "setArrayTask");
 
-            Docs.createDocument(aClient, Firestore::Parent(FIREBASE_PROJECT_ID), documentPath, DocumentMask(), doc, asyncCB, "createDocumentTask");
+            // Set float
+            Database.set<number_t>(aClient, "/test/float", number_t(123.456, 2), asyncCB, "setFloatTask");
+
+            // Set double
+            Database.set<number_t>(aClient, "/test/double", number_t(1234.56789, 4), asyncCB, "setDoubleTask");
         }
 
-        String documentPath = "info/countries";
-
-        Serial.println("Get a document...");
-
-        Docs.get(aClient, Firestore::Parent(FIREBASE_PROJECT_ID), documentPath, GetDocumentOptions(DocumentMask("Singapore")), asyncCB, "getTask");
     }
 
 }

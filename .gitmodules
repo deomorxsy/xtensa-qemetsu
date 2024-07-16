@@ -1,0 +1,3 @@
+[submodule "lib/esp32-cam-webserver"]
+	path = lib/esp32-cam-webserver
+	url = git@github.com:easytarget/esp32-cam-webserver.git

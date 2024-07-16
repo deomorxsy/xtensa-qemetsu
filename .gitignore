@@ -4,11 +4,12 @@
 .gcc-flags.json
 .ccls
 src/secrets.h
+src/secrets.c
 /assets/
 /artifacts/
 merged-flash.bin
 compile_commands.json
-
+/venv/
 
 # lsp-based (clangd)
 .cache/
@@ -47,3 +48,5 @@ compile_commands.json
 *.out
 *.app
 
+# other secrets
+google-app-credentials.json
