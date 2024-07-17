@@ -6,11 +6,36 @@
 #include <DNSServer.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
-#include "../lib/esp32-cam-webserver/src/parsebytes.h"
+//#include "../lib/esp32-cam-webserver/src/parsebytes.h"
 #include "time.h"
 #include <ESPmDNS.h>
 //#include "../lib/esp32-cam-webserver/app_httpd.cpp" // redefinition of esp_err_t stream_handler()
-extern void parseBytes(const char* str, char sep, byte* bytes, int maxBytes, int base);
+//extern void parseBytes(const char* str, char sep, byte* bytes, int maxBytes, int base);
+
+// esp32-CAM person detection: it uses a wrapper around Tensorflow
+//#include "irisModel.h"
+#include <tflm_esp32.h>
+//#include <eloquent_tensorflow32.h>
+#include <eloquent_tinyml.h>
+#include <eloquent_tinyml/zoo/person_detection.h>
+//#include <eloquent_esp32cam.h>
+
+//using Eloquent::Esp32::TensorFlow;
+
+#include <tflm_esp32.h>
+#include <eloquent_tinyml.h>
+#include <eloquent_tinyml/zoo/person_detection.h>
+#include <eloquent_esp32cam.h>
+
+#define ARENA_SIZE 2000
+Eloquent::TF::Sequential<TF_NUM_OPS, ARENA_SIZE> tf;
+
+using eloq::camera;
+using eloq::tinyml::zoo::personDetection;
+
+
+
+
 
 // The Private Interrupt Watchdog API
 #include <esp_int_wdt.h>
@@ -218,7 +243,6 @@ void setup() {
 
   Serial.println("Starting setup...");
 
-
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -265,8 +289,52 @@ void setup() {
   startCameraServer();
   Serial.print("Camera Stream Ready! Go to: http://");
   Serial.print(WiFi.localIP());
+
+  // Person recognition based on the IO0 automated snapshot
+  Serial.println("__PERSON DETECTION__");
+
+  // camera settings
+    // replace with your own model!
+    camera.pinout.freenove_s3();
+    camera.brownout.disable();
+    // only works on 96x96 (yolo) grayscale images
+    camera.resolution.yolo();
+    camera.pixformat.gray();
+
+    // init camera
+    while (!camera.begin().isOk())
+        Serial.println(camera.exception.toString());
+
+    // init tf model
+    while (!personDetection.begin().isOk())
+        Serial.println(personDetection.exception.toString());
+
+    Serial.println("Camera OK");
+    Serial.println("Point the camera to yourself");
+
 }
 
 void loop() {
-  delay(1);
+    delay(1);
+
+    Serial.println("Loop");
+
+    // capture picture
+    if (!camera.capture().isOk()) {
+        Serial.println(camera.exception.toString());
+        return;
+    }
+
+    // run person detection
+    if (!personDetection.run(camera).isOk()) {
+        Serial.println(personDetection.exception.toString());
+        return;
+    }
+
+    // a person has been detected!
+    if (personDetection) {
+        Serial.print("Person detected in ");
+        Serial.print(personDetection.tf.benchmark.millis());
+        Serial.println("ms");
+    }
 }

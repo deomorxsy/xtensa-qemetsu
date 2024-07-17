@@ -1,16 +1,25 @@
 #include "./secrets.c"
 
+//type of realtimedatabase return
+#include <iostream>
+#include <typeinfo>
+#include <cxxabi.h>
+
 #include "Arduino.h"
 #include "core/AsyncClient/AsyncClient.h"
 #include "core/NetConfig.h"
+#include "pins_arduino.h"
 //#include "firestore/Documents.h"
 //#include "firestore/Values.h"
 #include <ESP8266WiFi.h>
 #include <FirebaseClient.h>
 //#include <system_error.h>
 
-
+// Sensors definition
 #define PIR_SENSOR_PIN D1
+#define SOUND_SENSOR_PIN D2 // previously A0
+#define LED_PIN D3
+#define BUTTON_PIN D4
 
 // Wi-Fi credentials
 #ifndef WIFI_SSID
@@ -21,7 +30,9 @@
 #endif
 
 // Firebase console > Project Overview > Project settings.
+#ifndef API_KEY
 #define API_KEY         "web_API_KEY"
+#endif
 
 #ifndef USER_MAIL
 #define USER_MAIL       "USER_MAIL"
@@ -41,6 +52,7 @@
 
 void asyncCB(AsyncResult &aResult);
 void printResult(AsyncResult &aResult);
+void printError(int code, const String &msg);
 
 
 UserAuth user_auth(API_KEY, USER_MAIL, USER_PASSWORD);
@@ -65,16 +77,23 @@ RealtimeDatabase Database;
 // Firestore
 //Firestore::Documents Docs;
 
+
+//int counter = 0;
 bool taskComplete = false;
-int counter = 0;
 unsigned long dataMillis = 0;
+const unsigned long interval = 90000; // 1m30s
+bool ledState = false;
+bool buttonState = false;
+bool lastButtonState = false;
 
 void setup() {
     Serial.begin(115200);
     pinMode(PIR_SENSOR_PIN, INPUT);
+    pinMode(SOUND_SENSOR_PIN, INPUT);
+    pinMode(LED_PIN, OUTPUT);
+    pinMode(BUTTON_PIN, INPUT_PULLUP);
 
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
     Serial.print("Connecting to Wi-FI...");
     while (WiFi.status() != WL_CONNECTED)
     {
@@ -89,7 +108,6 @@ void setup() {
     Serial.println();
 
     Firebase.printf("Firebase Client v%s\n", FIREBASE_CLIENT_VERSION);
-
     Serial.println("Initializing app...");
 
 #if defined(ESP32) || defined(ESP8266)
@@ -110,6 +128,9 @@ void setup() {
 
     Database.url(DATABASE_URL);
 
+    // In sync functions, we have to set the operating result for the client that works with the function.
+    // This code uses async.
+    //client.setAsyncResult(result);
 
     Serial.println("Setup finished.");
 
@@ -118,77 +139,74 @@ void setup() {
 void loop() {
 
     app.loop();
+    Database.loop();
 
-    //PIR logic
-    int pir_signal = digitalRead(PIR_SENSOR_PIN);
-
-    // HIGH
-    if (Database.set<bool>(aClient, "/test/bool", true, asyncCB, "setBoolTask")) {
-    //if (Firebase.setInt(firebaseData, "/soundSensor", soundValue)) {
-    Serial.println("Sound sensor value updated");
-    } else {
-        Serial.println("Failed to update sound sensor value");
-        Serial.println(firebaseData.errorReason());
-    }
-
-    if (Firebase.setInt(firebaseData, "/pirSensor", pirValue)) {
-        Serial.println("PIR sensor value updated");
-    } else {
-        Serial.println("Failed to update PIR sensor value");
-        Serial.println(firebaseData.errorReason());
-    }
-    // LOW
-
-    if (app.ready() && (millis() - dataMillis > 60000 || dataMillis == 0))
+    unsigned long currentMillis = millis();
+    if (currentMillis - dataMillis >= interval)
     {
-        dataMillis = millis();
+        dataMillis = currentMillis;
 
-        if (app.ready() && !taskComplete)
+        // Read sensor values
+        bool soundValue = digitalRead(SOUND_SENSOR_PIN);
+        bool pirValue = digitalRead(PIR_SENSOR_PIN);
+
+        // Send sensor values to Firebase. push to add a line
+
+        Serial.print("Push bool... ");
+        //bool name;
+        /*Database.push<bool>(aClient, "/sensors/sound", soundValue, asyncCB, "setSoundValueTask");
+        if (aClient.lastError().code() == 0) {
+            Firebase.printf("ok, sound typeName: %s\n", typename.c_str());
+        } else
+            printError(aClient.lastError().code(), aClient.lastError().message());
+
+        result = Database.push<bool>(aClient, "/sensors/pir", pirValue, asyncCB, "setPirValueTask");
+        if (aClient.lastError().code() == 0) {
+            std::string typename = demangle(typeid(result).name());
+            Firebase.printf("ok, PIR typeName: %s\n", typename.c_str());
+        } else
+            printError(aClient.lastError().code(), aClient.lastError().message());
+        */
+        Database.push<bool>(aClient, "/sensors/sound", soundValue, asyncCB, "setSoundValueTask");
+        //if (aClient.lastError().code() == 0)
+        //    Firebase.printf("ok, name: %s\n", name.c_str());
+        //else
+            //    printError(aClient.lastError().code(), aClient.lastError().message());
+
+
+        Database.push<bool>(aClient, "/sensors/pir", pirValue, asyncCB, "setPirValueTask");
+        //if (aClient.lastError().code() == 0)
+        //    Firebase.printf("ok, name: %s\n", name.c_str());
+        //else
+        //    printError(aClient.lastError().code(), aClient.lastError().message());
+
+        Serial.print("Sound value: ");
+        Serial.println(soundValue);
+        Serial.print("PIR value: ");
+        Serial.println(pirValue);
+
+        // Control LED based on sensor values
+        if (!soundValue && !pirValue)
         {
-            taskComplete = true;
-
-
-            // Set int
-            Database.set<int>(aClient, "/test/int", 12345, asyncCB, "setIntTask");
-            // Set bool
-            Database.set<bool>(aClient, "/test/bool", true, asyncCB, "setBoolTask");
-
-            // Set string
-            Database.set<String>(aClient, "/test/string", "hello", asyncCB, "setStringTask");
-
-            // Set json
-            Database.set<object_t>(aClient, "/test/json", object_t("{\"data\":123}"), asyncCB, "setJsonTask");
-            //Docs.createDocument(aClient, Firestore::Parent(FIREBASE_PROJECT_ID), documentPath, DocumentMask(), doc, asyncCB, "createDocumentTask");
-            //
-            object_t json, obj1, obj2, obj3, obj4;
-            JsonWriter writer;
-
-            writer.create(obj1, "int/value", 9999);
-            writer.create(obj2, "string/value", string_t("hello"));
-            writer.create(obj3, "float/value", number_t(123.456, 2));
-            writer.join(obj4, 3 /* no. of object_t (s) to join */, obj1, obj2, obj3);
-            writer.create(json, "node/list", obj4);
-
-            // To print object_t
-            // Serial.println(json);
-
-            Database.set<object_t>(aClient, "/test/json", json, asyncCB, "setJsonTask");
-
-            object_t arr;
-            arr.initArray(); // initialize to be used as array
-            writer.join(arr, 4 /* no. of object_t (s) to join */, object_t("[12,34]"), object_t("[56,78]"), object_t(string_t("steve")), object_t(888));
-
-            // Set array
-            Database.set<object_t>(aClient, "/test/arr", arr, asyncCB, "setArrayTask");
-
-            // Set float
-            Database.set<number_t>(aClient, "/test/float", number_t(123.456, 2), asyncCB, "setFloatTask");
-
-            // Set double
-            Database.set<number_t>(aClient, "/test/double", number_t(1234.56789, 4), asyncCB, "setDoubleTask");
+            ledState = false; // Turn off LED
         }
-
+        else
+        {
+            ledState = true; // Turn on LED
+        }
+        digitalWrite(LED_PIN, ledState);
     }
+
+    // Read button state
+    buttonState = digitalRead(BUTTON_PIN);
+    if (buttonState == LOW && lastButtonState == HIGH)
+    {
+        ledState = !ledState; // Toggle LED state
+        digitalWrite(LED_PIN, ledState);
+    }
+    lastButtonState = buttonState;
+
+    //if (app.ready() && !taskComplete) {}
 
 }
 
@@ -221,4 +239,18 @@ void printResult(AsyncResult &aResult)
     {
         Firebase.printf("task: %s, payload: %s\n", aResult.uid().c_str(), aResult.c_str());
     }
+}
+
+void printError(int code, const String &msg)
+{
+    Firebase.printf("Error, msg: %s, code: %d\n", msg.c_str(), code);
+}
+
+std::string demangle(const char* name) {
+    int status = -4; // some arbitrary value to eliminate the compiler warning
+    char* res = abi::__cxa_demangle(name, NULL, NULL, &status);
+    const char* const demangled_name = (status == 0) ? res : name;
+    std::string ret_val(demangled_name);
+    free(res);
+    return ret_val;
 }
