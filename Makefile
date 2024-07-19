@@ -6,9 +6,7 @@ SHELL = /bin/sh
 VENV = /home/asari/.config/nvim/venv_nvim/neovim3/
 BIN=$(VENV)/bin
 
-all:
-	build
-	upload
+all: build upload
 
 venv:
 	. /home/asari/.config/nvim/venv_nvim/neovim3/bin/activate
@@ -35,8 +33,14 @@ nodemcu: venv
 lsp: venv
 	pio run --target compiledb
 
-upload: venv
-	pio run --target upload
+upload: venv upload_nodemcu upload_esp32cam
+	#pio run --target upload
+
+upload_nodemcu: nodemcu
+	pio run --target upload --environment nodemcuv2
+
+upload_esp32cam: esp32
+	pio run --target upload --environment esp32cam
 
 debug: venv
 	pio device monitor --filter debug

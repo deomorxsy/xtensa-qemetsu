@@ -13,13 +13,18 @@
 //#include "firestore/Values.h"
 #include <ESP8266WiFi.h>
 #include <FirebaseClient.h>
+#include <coredecls.h>       // settimeofday_cb()
 //#include <system_error.h>
 
 // Sensors definition
+    // Sensors definition
+#define ANALOG_SOUND A0 // brown
+#define DIGITAL_SOUND D3 // green, A0
+                         //
 #define PIR_SENSOR_PIN D1
-#define SOUND_SENSOR_PIN D2 // previously A0
-#define LED_PIN D3
-#define BUTTON_PIN D4
+#define LED_PIN D8
+
+//#define BUTTON_PIN D4
 
 // Wi-Fi credentials
 #ifndef WIFI_SSID
@@ -54,10 +59,14 @@ void asyncCB(AsyncResult &aResult);
 void printResult(AsyncResult &aResult);
 void printError(int code, const String &msg);
 
+void processMessage(char* message);
+void sendDataToFireStore(double pressure_val, double temperature_val, double humidity_val, int z_val);
 
 UserAuth user_auth(API_KEY, USER_MAIL, USER_PASSWORD);
 
+// instance of app and firestore docs
 FirebaseApp app;
+Firestore::Documents Docs;
 
 #if defined(ESP32) || defined(ESP8266)
 #include <WiFiClientSecure.h>
@@ -77,6 +86,20 @@ RealtimeDatabase Database;
 // Firestore
 //Firestore::Documents Docs;
 
+/* Config Variables for specific time zone START */
+#define TZ +7     // (utc+) TZ in hours
+#define DST_MN 0  // use 60mn for summer time in some countries
+#define TZ_MN ((TZ)*60)
+#define TZ_SEC ((TZ)*3600)
+#define DST_SEC ((DST_MN)*60)
+
+timeval cbtime;  // time set in callback
+bool cbtime_set = false;
+void time_is_set(void) {
+  gettimeofday(&cbtime, NULL);
+  cbtime_set = true;
+}
+/* Config Variables for specific time zone END */
 
 //int counter = 0;
 bool taskComplete = false;
@@ -86,13 +109,21 @@ bool ledState = false;
 bool buttonState = false;
 bool lastButtonState = false;
 
+int cnt = 0;
+
+//int ledPin=13;
+//int sensorPin=7;
+boolean pirVal =0;
+boolean soundVal=0;
+int threshold = 500;
+
 void setup() {
     Serial.begin(115200);
     pinMode(PIR_SENSOR_PIN, INPUT);
     pinMode(SOUND_SENSOR_PIN, INPUT);
     pinMode(LED_PIN, OUTPUT);
     pinMode(BUTTON_PIN, INPUT_PULLUP);
-
+    /*
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     Serial.print("Connecting to Wi-FI...");
     while (WiFi.status() != WL_CONNECTED)
@@ -106,9 +137,12 @@ void setup() {
     Serial.print("Connected with IP: ");
     Serial.println(WiFi.localIP());
     Serial.println();
+    */
 
-    Firebase.printf("Firebase Client v%s\n", FIREBASE_CLIENT_VERSION);
-    Serial.println("Initializing app...");
+      /* Calibrate the local time by pulling the UNIX time from the network after connecting to the internet */
+    /*
+    settimeofday_cb(time_is_set);
+    configTime(TZ_SEC, DST_SEC, "pool.ntp.org");
 
 #if defined(ESP32) || defined(ESP8266)
     ssl_client.setInsecure();
@@ -117,12 +151,11 @@ void setup() {
 #endif
 #endif
 
-
     // init Firebase connection
     initializeApp(aClient, app, getAuth(user_auth), asyncCB, "authTask");
 
     // bind FirebaseApp for authentication handler
-    app.getApp<RealtimeDatabase>(Database);
+    //app.getApp<RealtimeDatabase>(Database);
     // unbind with Docs.resetApp();
     //app.getApp<Firestore::Documents>(Docs);
 
@@ -131,59 +164,93 @@ void setup() {
     // In sync functions, we have to set the operating result for the client that works with the function.
     // This code uses async.
     //client.setAsyncResult(result);
+    Firebase.printf("Firebase Client v%s\n", FIREBASE_CLIENT_VERSION);
+    Serial.println("Initializing app...");
 
-    Serial.println("Setup finished.");
+    app.getApp<Firestore::Documents>(Docs);
+
+    Serial.println("Setup finished.");*/
 
 }
 
 void loop() {
 
-    app.loop();
-    Database.loop();
+    //Serial.println("Entering loop...");
+    Serial.println("ALO");
 
-    unsigned long currentMillis = millis();
-    if (currentMillis - dataMillis >= interval)
+    //app.loop();
+    //Database.loop();
+
+    pirVal =digitalRead(SOUND_SENSOR_PIN);
+    Serial.println(pirVal);
+    soundVal =digitalRead(PIR_SENSOR_PIN);
+    Serial.println(soundVal);
+
+    if (pirVal == HIGH || soundVal > threshold) {
+        digitalWrite(LED_PIN, HIGH);
+    }
+    else {
+        digitalWrite(LED_PIN, LOW);
+    }
+
+    /*
+    if (app.ready() && !taskComplete)
     {
-        dataMillis = currentMillis;
+
+        Serial.println("Async push!");
+        taskComplete = true;
+    //unsigned long currentMillis = millis();
+    //if (currentMillis - dataMillis >= interval)
+    //{
+        //dataMillis = currentMillis;
+
+        // We will create the document in the parent path "a0/b?
+        // a0 is the collection id, b? is the document id in collection a0.
+        String documentPath = "lumenssif/sensors";
+        documentPath += cnt;
+
+        // boolean
+        Values::BooleanValue bolV(true);
 
         // Read sensor values
         bool soundValue = digitalRead(SOUND_SENSOR_PIN);
         bool pirValue = digitalRead(PIR_SENSOR_PIN);
 
+        String doc_path = "projects/";
+        doc_path += FIREBASE_PROJECT_ID;
+        doc_path += "/databases/(default)/documents/coll_id/doc_id"; // coll_id and doc_id are your collection id and document id
+
         // Send sensor values to Firebase. push to add a line
 
         Serial.print("Push bool... ");
-        //bool name;
-        /*Database.push<bool>(aClient, "/sensors/sound", soundValue, asyncCB, "setSoundValueTask");
-        if (aClient.lastError().code() == 0) {
-            Firebase.printf("ok, sound typeName: %s\n", typename.c_str());
-        } else
-            printError(aClient.lastError().code(), aClient.lastError().message());
 
-        result = Database.push<bool>(aClient, "/sensors/pir", pirValue, asyncCB, "setPirValueTask");
-        if (aClient.lastError().code() == 0) {
-            std::string typename = demangle(typeid(result).name());
-            Firebase.printf("ok, PIR typeName: %s\n", typename.c_str());
-        } else
-            printError(aClient.lastError().code(), aClient.lastError().message());
-        */
+        // w104 sound sensor
         Database.push<bool>(aClient, "/sensors/sound", soundValue, asyncCB, "setSoundValueTask");
-        //if (aClient.lastError().code() == 0)
-        //    Firebase.printf("ok, name: %s\n", name.c_str());
-        //else
-            //    printError(aClient.lastError().code(), aClient.lastError().message());
-
-
-        Database.push<bool>(aClient, "/sensors/pir", pirValue, asyncCB, "setPirValueTask");
-        //if (aClient.lastError().code() == 0)
-        //    Firebase.printf("ok, name: %s\n", name.c_str());
-        //else
-        //    printError(aClient.lastError().code(), aClient.lastError().message());
-
         Serial.print("Sound value: ");
         Serial.println(soundValue);
+
+        // PIR sensor
+        Database.push<bool>(aClient, "/sensors/pir", pirValue, asyncCB, "setPirValueTask");
         Serial.print("PIR value: ");
         Serial.println(pirValue);
+        /*
+        object_t json, sound, pir, rtdb_log;
+        JsonWriter writer;
+
+        writer.create(sound, "int/value", 1);
+        writer.create(pir, "int/value", 1);
+        */
+        //writer.join(rtdb_log, 2 /* no. of object_t (s) to join */, sound, pir);
+        //writer.create(json, "node/list", rtdb_log);
+
+        /*
+         *
+         * //send Data to Firestore.
+        sendDataToFireStore(pressure_raw, temperature_raw, humidity_raw, z_raw);
+
+        Serial.println("Create document... ");
+
+        Docs.createDocument(aClient, Firestore::Parent(FIREBASE_PROJECT_ID), documentPath, DocumentMask(), doc, asyncCB, "createDocumentTask");
 
         // Control LED based on sensor values
         if (!soundValue && !pirValue)
@@ -195,6 +262,7 @@ void loop() {
             ledState = true; // Turn on LED
         }
         digitalWrite(LED_PIN, ledState);
+    //}
     }
 
     // Read button state
@@ -205,9 +273,10 @@ void loop() {
         digitalWrite(LED_PIN, ledState);
     }
     lastButtonState = buttonState;
-
     //if (app.ready() && !taskComplete) {}
-
+    *
+    *
+    * */
 }
 
 void asyncCB(AsyncResult &aResult)
@@ -244,6 +313,38 @@ void printResult(AsyncResult &aResult)
 void printError(int code, const String &msg)
 {
     Firebase.printf("Error, msg: %s, code: %d\n", msg.c_str(), code);
+}
+
+
+
+void sendDataToFireStore(double pressure_val, double temperature_val, double humidity_val, int z_val) {
+  /*
+  This function put sensor data into a desired format.
+  Then create a document for Firestore at a specified path.
+  */
+
+  //check if FirebaseApp is ready or not
+  if (app.ready()) {
+
+    String DOCUMENT_PATH = "sensor_data/d" + String(random(9000000));
+
+    /* format the sensor data */
+    Values::DoubleValue pressure(pressure_val);
+    Values::IntegerValue date(time(nullptr));
+    Values::DoubleValue temperature(temperature_val);
+    Values::DoubleValue humidity(humidity_val);
+    Values::IntegerValue z(z_val);
+
+    /* Creating a document and push to Firestore*/
+    Document<Values::Value> doc("pressure", Values::Value(pressure));
+    doc.add("date", Values::Value(date));
+    doc.add("temperature", Values::Value(temperature));
+    doc.add("humidity", Values::Value(humidity));
+    doc.add("z", Values::Value(z));
+
+    Serial.println("Create document... ");
+    Docs.createDocument(aClient, Firestore::Parent(FIREBASE_PROJECT_ID), DOCUMENT_PATH, DocumentMask(), doc, aResult_no_callback);
+  }
 }
 
 std::string demangle(const char* name) {

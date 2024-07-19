@@ -13,29 +13,18 @@
 //extern void parseBytes(const char* str, char sep, byte* bytes, int maxBytes, int base);
 
 // esp32-CAM person detection: it uses a wrapper around Tensorflow
-//#include "irisModel.h"
-#include <tflm_esp32.h>
-//#include <eloquent_tensorflow32.h>
-#include <eloquent_tinyml.h>
-#include <eloquent_tinyml/zoo/person_detection.h>
-//#include <eloquent_esp32cam.h>
-
-//using Eloquent::Esp32::TensorFlow;
-
 #include <tflm_esp32.h>
 #include <eloquent_tinyml.h>
 #include <eloquent_tinyml/zoo/person_detection.h>
 #include <eloquent_esp32cam.h>
 
-#define ARENA_SIZE 2000
-Eloquent::TF::Sequential<TF_NUM_OPS, ARENA_SIZE> tf;
+//using Eloquent::Esp32::TensorFlow;
+
+//#define ARENA_SIZE 2000
+//Eloquent::TF::Sequential<TF_NUM_OPS, ARENA_SIZE> tf;
 
 using eloq::camera;
 using eloq::tinyml::zoo::personDetection;
-
-
-
-
 
 // The Private Interrupt Watchdog API
 #include <esp_int_wdt.h>
@@ -258,8 +247,8 @@ void setup() {
   config.pin_pclk = PCLK_GPIO_NUM;
   config.pin_vsync = VSYNC_GPIO_NUM;
   config.pin_href = HREF_GPIO_NUM;
-  config.pin_sscb_sda = SIOD_GPIO_NUM;
-  config.pin_sscb_scl = SIOC_GPIO_NUM;
+  config.pin_sccb_sda = SIOD_GPIO_NUM;
+  config.pin_sccb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
