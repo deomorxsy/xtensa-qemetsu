@@ -47,5 +47,6 @@ debug: venv
 
 clean: venv
 	pio system prune
+	rm -rf "$HOME/.platformio/packages"
 
 
