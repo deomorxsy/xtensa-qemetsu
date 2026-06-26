@@ -120,3 +120,20 @@ EOF
 chmod +x ./scripts/flash.sh
 ./scripts/flash.sh
 ```
+
+
+### Acknowledgments
+
+Feedback at the time was provided by the following contributors:
+- name:  thaisNY (Thais Rodrigues)
+  github: https://github.com/thaisNY
+  orcid: unknown
+- name: guisilveira (Guilherme Silveira)
+  github: https://github.com/guisilveira
+  orcid: unknown
+- Jackson Raniel
+  github: https://github.com/jacksonraniel
+  orcid: https://orcid.org/0000-0002-4355-7410
+- Fernando Carvalho
+  github: unknown
+  orcid: https://orcid.org/0009-0005-4677-6917 
