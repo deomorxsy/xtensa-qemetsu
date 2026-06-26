@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "xtensa-qemetsu"
+abstract: "deploy, trace and monitor a busybox/LFS based distro."
+authors:
+- name: deomorxsy
+  orcid: https://orcid.org/0009-0002-8685-3460
+contributors:
+- name:  thaisNY (Thais Rodrigues)
+  github: https://github.com/thaisNY
+  orcid: none
+- name: guisilveira (Guilherme Silveira)
+  github: https://github.com/guisilveira
+  orcid: none
+version: v1.0.0
+doi: none
+date-released: 2024-07-19
+url: "https://github.com/deomorxsy/xtensa-qemetsu"
