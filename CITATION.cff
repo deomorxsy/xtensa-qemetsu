@@ -8,10 +8,16 @@ authors:
 contributors:
 - name:  thaisNY (Thais Rodrigues)
   github: https://github.com/thaisNY
-  orcid: none
+  orcid: unknown
 - name: guisilveira (Guilherme Silveira)
   github: https://github.com/guisilveira
-  orcid: none
+  orcid: unknown
+- Jackson Raniel
+  github: https://github.com/jacksonraniel
+  orcid: https://orcid.org/0000-0002-4355-7410
+- Fernando Carvalho
+  github: unknown
+  orcid: https://orcid.org/0009-0005-4677-6917
 version: v1.0.0
 doi: 10.5281/zenodo.20937302
 date-released: 2024-07-19
